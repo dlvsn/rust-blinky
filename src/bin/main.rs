@@ -11,6 +11,9 @@ use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull};
 use esp_hal::main;
 use esp_hal::time::{Duration, Instant};
+use esp_println::println;
+
+use blinky::led::{Color, Led};
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
@@ -34,30 +37,72 @@ fn main() -> ! {
     let peripherals = esp_hal::init(config);
 
     let mut leds = [
-        Output::new(peripherals.GPIO23, Level::High, OutputConfig::default()),
-        Output::new(peripherals.GPIO22, Level::Low, OutputConfig::default()),
-        Output::new(peripherals.GPIO21, Level::Low, OutputConfig::default()),
-        Output::new(peripherals.GPIO16, Level::Low, OutputConfig::default()),
+        Led::new(
+            Output::new(peripherals.GPIO23, Level::Low, OutputConfig::default()),
+            Color::Yellow,
+        ),
+        Led::new(
+            Output::new(peripherals.GPIO22, Level::Low, OutputConfig::default()),
+            Color::Blue,
+        ),
+        Led::new(
+            Output::new(peripherals.GPIO21, Level::Low, OutputConfig::default()),
+            Color::White,
+        ),
+        Led::new(
+            Output::new(peripherals.GPIO16, Level::Low, OutputConfig::default()),
+            Color::Red,
+        ),
+        Led::new(
+            Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default()),
+            Color::Green,
+        ),
     ];
 
-    let button = Input::new(
+    let first_button = Input::new(
+        peripherals.GPIO15,
+        InputConfig::default().with_pull(Pull::Up),
+    );
+
+    let second_button = Input::new(
         peripherals.GPIO18,
         InputConfig::default().with_pull(Pull::Up),
     );
 
+    println!("All LEDs are turned off");
+
     let mut current = 0;
-    let mut was_pressed = false;
+    let mut enabled = false;
+    let mut first_btn_state = false;
+    let mut second_btn_state = false;
 
     loop {
-        let pressed = button.is_low();
+        let first_pressed = first_button.is_low();
+        let second_pressed = second_button.is_low();
 
-        if pressed && !was_pressed {
-            leds[current].set_low();
-            current = (current + 1) % leds.len();
-            leds[current].set_high();
+        if first_pressed && !first_btn_state {
+            enabled = !enabled;
+            if enabled {
+                current = 0;
+                leds[current].on();
+                println!("Turn on LED: {:?}", leds[current].color());
+            } else {
+                for led in leds.iter_mut() {
+                    led.off();
+                }
+                println!("All LEDs are turned off");
+            }
         }
 
-        was_pressed = pressed;
+        if enabled && second_pressed && !second_btn_state {
+            leds[current].off();
+            current = (current + 1) % leds.len();
+            leds[current].on();
+            println!("Turn on LED: {:?}", leds[current].color());
+        }
+
+        first_btn_state = first_pressed;
+        second_btn_state = second_pressed;
         delay_ms(20);
     }
 }
